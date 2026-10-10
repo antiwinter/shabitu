@@ -17,11 +17,14 @@ const MIME = {
   '.avif': 'image/avif',
 }
 const collator = new Intl.Collator('zh', { numeric: true })
+// files/folders whose name contains any of these are skipped when loading a dataset
+const SKIP_NAME_PARTS = ['封面', '答案']
+const isSkipped = (name) => SKIP_NAME_PARTS.some((p) => name.includes(p))
 
 function walk(dir, base = '') {
   let out = []
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name.startsWith('.')) continue
+    if (entry.name.startsWith('.') || isSkipped(entry.name)) continue
     const rel = base ? `${base}/${entry.name}` : entry.name
     const full = path.join(dir, entry.name)
     if (entry.isDirectory()) out = out.concat(walk(full, rel))

@@ -91,6 +91,57 @@ figcaption {
   color: #888;
 }
 
+.stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  width: 100%;
+  max-width: 1000px;
+}
+
+.stage figure {
+  flex: 1;
+  min-width: 0;
+}
+
+.toggle-area {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.mark-btn {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: 0.85;
+  transition:
+    transform 0.1s,
+    opacity 0.1s;
+}
+
+.mark-btn:hover {
+  opacity: 1;
+  transform: scale(1.08);
+}
+
+.mark-btn:active {
+  transform: scale(0.95);
+}
+
+.mark-btn.unknown {
+  background: #e53935;
+}
+
+.mark-btn.known {
+  background: #43a047;
+}
+
 .empty,
 .err {
   grid-column: 1 / -1;

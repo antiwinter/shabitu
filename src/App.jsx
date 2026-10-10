@@ -141,6 +141,16 @@ export default function App() {
   const current = visible[index]
   const src = current ? fileUrl(current) : null
 
+  const mark = useCallback(
+    (known) => {
+      if (!current) return
+      setDb((d) => (known ? markKnown(d, current) : markUnknown(d, current)))
+      setIndex((i) => Math.min(visible.length - 1, i + 1))
+      setShowRef(false)
+    },
+    [visible.length, current],
+  )
+
   const onKey = useCallback(
     (e) => {
       if (e.target.tagName === 'SELECT') return
@@ -156,13 +166,10 @@ export default function App() {
         setShowRef((v) => !v)
       } else if (showRef && current && (e.key === 'h' || e.key === 'l' || e.key === 'Enter')) {
         e.preventDefault()
-        const known = e.key !== 'h'
-        setDb((d) => (known ? markKnown(d, current) : markUnknown(d, current)))
-        setIndex((i) => Math.min(last, i + 1))
-        setShowRef(false)
+        mark(e.key !== 'h')
       }
     },
-    [visible.length, showRef, current],
+    [visible.length, showRef, current, mark],
   )
 
   useEffect(() => {
@@ -227,16 +234,49 @@ export default function App() {
       <main>
         {src ? (
           <>
-            <figure>
-              {showRef ? (
-                <FilteredCanvas src={src} filter={filter} />
-              ) : (
-                <img src={src} alt="original image" />
+            <div className="stage">
+              {showRef && (
+                <button
+                  type="button"
+                  className="mark-btn unknown"
+                  title="Don't know (h)"
+                  aria-label="Don't know"
+                  onClick={(e) => {
+                    mark(false)
+                    e.currentTarget.blur()
+                  }}
+                />
               )}
-              <figcaption>
-                {showRef ? `Ref image — ${filter.label}` : 'Original image'} (space to toggle)
-              </figcaption>
-            </figure>
+              <figure>
+                <div
+                  className="toggle-area"
+                  onClick={() => setShowRef((v) => !v)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {showRef ? (
+                    <FilteredCanvas src={src} filter={filter} />
+                  ) : (
+                    <img src={src} alt="original image" />
+                  )}
+                </div>
+                <figcaption>
+                  {showRef ? `Ref image — ${filter.label}` : 'Original image'} (click or space to
+                  toggle)
+                </figcaption>
+              </figure>
+              {showRef && (
+                <button
+                  type="button"
+                  className="mark-btn known"
+                  title="Know (l)"
+                  aria-label="Know"
+                  onClick={(e) => {
+                    mark(true)
+                    e.currentTarget.blur()
+                  }}
+                />
+              )}
+            </div>
           </>
         ) : (
           <div className="empty">No pictures</div>
