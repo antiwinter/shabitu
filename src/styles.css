@@ -49,6 +49,26 @@ header select {
   user-select: none;
 }
 
+.export-btn {
+  font-size: 14px;
+  padding: 4px 10px;
+  background: #2a2a2a;
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.export-btn:hover:not(:disabled) {
+  background: #333;
+}
+
+.export-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .info {
   font-size: 13px;
   color: #aaa;

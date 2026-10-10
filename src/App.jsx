@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { filters, defaultFilterId } from './filters/index.js'
 import { loadDb, saveDb, isNewOrDue, markKnown, markUnknown } from './sprs.js'
+import { buildApkg } from './anki.js'
 
 const STORAGE_KEYS = {
   dataset: 'shabitu.dataset',
@@ -75,6 +76,35 @@ export default function App() {
   const pendingImage = useRef(null) // picture to jump to once the visible list is rebuilt
 
   const filter = filters.find((f) => f.id === filterId) || filters[0]
+
+  const [exporting, setExporting] = useState(null) // null | { done, total }
+
+  const exportAnki = async () => {
+    if (exporting || !dataset || !images.length) return
+    setExporting({ done: 0, total: images.length })
+    try {
+      const blob = await buildApkg({
+        deckName: stripLeadingDigits(dataset),
+        images,
+        urlFor: fileUrl,
+        filter,
+        onProgress: (done, total) => setExporting({ done, total }),
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${stripLeadingDigits(dataset) || 'shabitu'}.apkg`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 10000)
+    } catch (err) {
+      console.error(err)
+      alert('Export failed: ' + (err?.message || err))
+    } finally {
+      setExporting(null)
+    }
+  }
 
   useEffect(() => {
     save(STORAGE_KEYS.filter, filterId)
@@ -212,6 +242,18 @@ export default function App() {
           />
           learn
         </label>
+        <button
+          type="button"
+          className="export-btn"
+          title="Export the current dataset as an Anki bundle (.apkg)"
+          disabled={!!exporting || !images.length}
+          onClick={(e) => {
+            exportAnki()
+            e.currentTarget.blur()
+          }}
+        >
+          {exporting ? `exporting ${exporting.done}/${exporting.total}` : 'export anki'}
+        </button>
         <span className="info">
           {visible.length ? `${index + 1} / ${visible.length}` : '0 / 0'}
           {current && ` — ${current.split('/').slice(1).join('/')}`}
