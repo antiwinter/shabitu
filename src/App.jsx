@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { filters, defaultFilterId } from './filters/index.js'
+import { loadDb, saveDb, isNewOrDue, markKnown, markUnknown } from './sprs.js'
 
 const STORAGE_KEYS = {
   dataset: 'shabitu.dataset',
   filter: 'shabitu.filter',
   image: 'shabitu.image',
+  learn: 'shabitu.learn',
 }
 const loadSaved = (key) => {
   try {
@@ -66,11 +68,33 @@ export default function App() {
     return filters.some((f) => f.id === saved) ? saved : defaultFilterId
   })
 
+  const [learn, setLearn] = useState(() => loadSaved(STORAGE_KEYS.learn) === '1')
+  const [db, setDb] = useState(loadDb)
+  const dbRef = useRef(db)
+  dbRef.current = db
+  const pendingImage = useRef(null) // picture to jump to once the visible list is rebuilt
+
   const filter = filters.find((f) => f.id === filterId) || filters[0]
 
   useEffect(() => {
     save(STORAGE_KEYS.filter, filterId)
   }, [filterId])
+
+  useEffect(() => {
+    save(STORAGE_KEYS.learn, learn ? '1' : '0')
+  }, [learn])
+
+  useEffect(() => {
+    saveDb(db)
+  }, [db])
+
+  // The list being browsed. In learn mode it is a snapshot of new/due pictures taken when
+  // the dataset or mode changes (db is read via ref on purpose), so marking a picture
+  // doesn't reshuffle the list under the cursor.
+  const visible = useMemo(
+    () => (learn ? images.filter((id) => isNewOrDue(dbRef.current, id)) : images),
+    [images, learn],
+  )
 
   useEffect(() => {
     if (dataset) save(STORAGE_KEYS.dataset, dataset)
@@ -95,40 +119,56 @@ export default function App() {
       .then((r) => r.json())
       .then((list) => {
         if (cancelled) return
-        // restore the last viewed picture if it belongs to this dataset (batched with setImages)
-        const savedIndex = list.indexOf(loadSaved(STORAGE_KEYS.image))
+        // restore the last viewed picture once the visible list is built (see effect below)
+        pendingImage.current = loadSaved(STORAGE_KEYS.image)
         setImages(list)
-        setIndex(savedIndex >= 0 ? savedIndex : 0)
       })
     return () => {
       cancelled = true
     }
   }, [dataset])
 
+  // once the visible list is available, jump to the wanted picture (saved one / current one)
+  useEffect(() => {
+    if (!visible.length) return
+    const want = pendingImage.current
+    pendingImage.current = null
+    const i = want ? visible.indexOf(want) : -1
+    // fall back to a clamped index when the wanted picture isn't in the list
+    setIndex((cur) => (i >= 0 ? i : Math.min(cur, visible.length - 1)))
+  }, [visible])
+
+  const current = visible[index]
+  const src = current ? fileUrl(current) : null
+
   const onKey = useCallback(
     (e) => {
       if (e.target.tagName === 'SELECT') return
+      const last = visible.length - 1
       if (e.key === 'ArrowLeft' || e.key === 'k') {
         setIndex((i) => Math.max(0, i - 1))
         setShowRef(false)
       } else if (e.key === 'ArrowRight' || e.key === 'j') {
-        setIndex((i) => Math.min(images.length - 1, i + 1))
+        setIndex((i) => Math.min(last, i + 1))
         setShowRef(false)
       } else if (e.key === ' ') {
         e.preventDefault()
         setShowRef((v) => !v)
+      } else if (showRef && current && (e.key === 'h' || e.key === 'l' || e.key === 'Enter')) {
+        e.preventDefault()
+        const known = e.key !== 'h'
+        setDb((d) => (known ? markKnown(d, current) : markUnknown(d, current)))
+        setIndex((i) => Math.min(last, i + 1))
+        setShowRef(false)
       }
     },
-    [images.length],
+    [visible.length, showRef, current],
   )
 
   useEffect(() => {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onKey])
-
-  const current = images[index]
-  const src = current ? fileUrl(current) : null
 
   // persist the picture being viewed (only once images are loaded, so a reload can restore it)
   useEffect(() => {
@@ -151,8 +191,22 @@ export default function App() {
             </option>
           ))}
         </select>
+        <label className="learn-toggle" title="Only show new and due pictures">
+          <input
+            type="checkbox"
+            checked={learn}
+            onChange={(e) => {
+              // keep the current picture selected when the list is rebuilt
+              pendingImage.current = current || null
+              setLearn(e.target.checked)
+              setShowRef(false)
+              e.target.blur()
+            }}
+          />
+          learn
+        </label>
         <span className="info">
-          {images.length ? `${index + 1} / ${images.length}` : '0 / 0'}
+          {visible.length ? `${index + 1} / ${visible.length}` : '0 / 0'}
           {current && ` — ${current.split('/').slice(1).join('/')}`}
         </span>
         <select

@@ -39,6 +39,16 @@ header select {
   border-radius: 4px;
 }
 
+.learn-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #ccc;
+  cursor: pointer;
+  user-select: none;
+}
+
 .info {
   font-size: 13px;
   color: #aaa;
