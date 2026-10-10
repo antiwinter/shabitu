@@ -1,7 +1,7 @@
 // Hue-bucket filter: for each pixel, snap hue to the center of a 10-degree bucket
 // (h = floor((h - 5) / 10) * 10 + 5), then force S = 100% and L = 80%.
 // Only hue information survives, so same-hue dots become identical colors.
-export const HUE_STEP = 5
+export const HUE_STEP = 15
 export const SATURATION = 1
 export const LIGHTNESS = 0.8
 
