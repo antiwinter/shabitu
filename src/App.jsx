@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { filters, defaultFilterId } from './filters/index.js'
 
-const STORAGE_KEYS = { dataset: 'shabitu.dataset', filter: 'shabitu.filter' }
+const STORAGE_KEYS = {
+  dataset: 'shabitu.dataset',
+  filter: 'shabitu.filter',
+  image: 'shabitu.image',
+}
 const loadSaved = (key) => {
   try {
     return localStorage.getItem(key)
@@ -89,7 +93,11 @@ export default function App() {
     fetch('/api/images?dataset=' + encodeURIComponent(dataset))
       .then((r) => r.json())
       .then((list) => {
-        if (!cancelled) setImages(list)
+        if (cancelled) return
+        // restore the last viewed picture if it belongs to this dataset (batched with setImages)
+        const savedIndex = list.indexOf(loadSaved(STORAGE_KEYS.image))
+        setImages(list)
+        setIndex(savedIndex >= 0 ? savedIndex : 0)
       })
     return () => {
       cancelled = true
@@ -113,6 +121,11 @@ export default function App() {
 
   const current = images[index]
   const src = current ? fileUrl(current) : null
+
+  // persist the picture being viewed (only once images are loaded, so a reload can restore it)
+  useEffect(() => {
+    if (current) save(STORAGE_KEYS.image, current)
+  }, [current])
 
   return (
     <div className="app">
