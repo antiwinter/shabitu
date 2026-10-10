@@ -60,6 +60,7 @@ export default function App() {
   const [dataset, setDataset] = useState('')
   const [images, setImages] = useState([])
   const [index, setIndex] = useState(0)
+  const [showRef, setShowRef] = useState(false)
   const [filterId, setFilterId] = useState(() => {
     const saved = loadSaved(STORAGE_KEYS.filter)
     return filters.some((f) => f.id === saved) ? saved : defaultFilterId
@@ -107,9 +108,16 @@ export default function App() {
   const onKey = useCallback(
     (e) => {
       if (e.target.tagName === 'SELECT') return
-      if (e.key === 'ArrowLeft') setIndex((i) => Math.max(0, i - 1))
-      else if (e.key === 'ArrowRight')
+      if (e.key === 'ArrowLeft' || e.key === 'k') {
+        setIndex((i) => Math.max(0, i - 1))
+        setShowRef(false)
+      } else if (e.key === 'ArrowRight' || e.key === 'j') {
         setIndex((i) => Math.min(images.length - 1, i + 1))
+        setShowRef(false)
+      } else if (e.key === ' ') {
+        e.preventDefault()
+        setShowRef((v) => !v)
+      }
     },
     [images.length],
   )
@@ -166,12 +174,14 @@ export default function App() {
         {src ? (
           <>
             <figure>
-              <img src={src} alt="original" />
-              <figcaption>Original</figcaption>
-            </figure>
-            <figure>
-              <FilteredCanvas src={src} filter={filter} />
-              <figcaption>{filter.label}</figcaption>
+              {showRef ? (
+                <FilteredCanvas src={src} filter={filter} />
+              ) : (
+                <img src={src} alt="original image" />
+              )}
+              <figcaption>
+                {showRef ? `Ref image — ${filter.label}` : 'Original image'} (space to toggle)
+              </figcaption>
             </figure>
           </>
         ) : (
