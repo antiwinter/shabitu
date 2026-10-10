@@ -1,9 +1,26 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { filters, defaultFilterId } from './filters/index.js'
+
+const STORAGE_KEYS = { dataset: 'shabitu.dataset', filter: 'shabitu.filter' }
+const loadSaved = (key) => {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+const save = (key, value) => {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    // ignore storage errors (private mode, quota, ...)
+  }
+}
 
 const stripLeadingDigits = (name) => name.replace(/^\d+/, '')
 const fileUrl = (rel) => '/data/' + rel.split('/').map(encodeURIComponent).join('/')
 
-function SquaredCanvas({ src }) {
+function FilteredCanvas({ src, filter }) {
   const canvasRef = useRef(null)
   const [error, setError] = useState(false)
 
@@ -20,18 +37,7 @@ function SquaredCanvas({ src }) {
       const ctx = canvas.getContext('2d')
       ctx.drawImage(img, 0, 0)
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-      const d = imageData.data
-      // lookup table: v/255 squared, back to 0..255
-      const lut = new Uint8ClampedArray(256)
-      for (let i = 0; i < 256; i++) {
-        const x = i / 255
-        lut[i] = Math.round(x * x * 255)
-      }
-      for (let i = 0; i < d.length; i += 4) {
-        d[i] = lut[d[i]]
-        d[i + 1] = lut[d[i + 1]]
-        d[i + 2] = lut[d[i + 2]]
-      }
+      filter.apply(imageData)
       ctx.putImageData(imageData, 0, 0)
     }
     img.onerror = () => !cancelled && setError(true)
@@ -39,7 +45,7 @@ function SquaredCanvas({ src }) {
     return () => {
       cancelled = true
     }
-  }, [src])
+  }, [src, filter])
 
   if (error) return <div className="err">Failed to load</div>
   return <canvas ref={canvasRef} />
@@ -50,13 +56,28 @@ export default function App() {
   const [dataset, setDataset] = useState('')
   const [images, setImages] = useState([])
   const [index, setIndex] = useState(0)
+  const [filterId, setFilterId] = useState(() => {
+    const saved = loadSaved(STORAGE_KEYS.filter)
+    return filters.some((f) => f.id === saved) ? saved : defaultFilterId
+  })
+
+  const filter = filters.find((f) => f.id === filterId) || filters[0]
+
+  useEffect(() => {
+    save(STORAGE_KEYS.filter, filterId)
+  }, [filterId])
+
+  useEffect(() => {
+    if (dataset) save(STORAGE_KEYS.dataset, dataset)
+  }, [dataset])
 
   useEffect(() => {
     fetch('/api/datasets')
       .then((r) => r.json())
       .then((list) => {
         setDatasets(list)
-        if (list.length) setDataset(list[0])
+        const saved = loadSaved(STORAGE_KEYS.dataset)
+        if (list.length) setDataset(list.includes(saved) ? saved : list[0])
       })
   }, [])
 
@@ -113,6 +134,20 @@ export default function App() {
           {images.length ? `${index + 1} / ${images.length}` : '0 / 0'}
           {current && ` — ${current.split('/').slice(1).join('/')}`}
         </span>
+        <select
+          style={{ marginLeft: 'auto' }}
+          value={filterId}
+          onChange={(e) => {
+            setFilterId(e.target.value)
+            e.target.blur()
+          }}
+        >
+          {filters.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.label}
+            </option>
+          ))}
+        </select>
       </header>
       <main>
         {src ? (
@@ -122,8 +157,8 @@ export default function App() {
               <figcaption>Original</figcaption>
             </figure>
             <figure>
-              <SquaredCanvas src={src} />
-              <figcaption>RGB² filter</figcaption>
+              <FilteredCanvas src={src} filter={filter} />
+              <figcaption>{filter.label}</figcaption>
             </figure>
           </>
         ) : (
