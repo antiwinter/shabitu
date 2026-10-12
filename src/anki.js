@@ -4,7 +4,7 @@ import JSZip from 'jszip'
 
 // Builds an Anki package (.apkg): a zip holding a legacy-schema (v11) sqlite collection,
 // a media map and the media files. Each picture becomes one note:
-//   Front = original image, Back = the image run through the current filter.
+//   Front = original image, Back = original image and the image run through the current filter.
 
 const MODEL_ID = 1700000000001
 const SEP = '\x1f'
@@ -222,7 +222,7 @@ export async function buildApkg({ deckName, images, urlFor, filter, onProgress }
     media[i * 2 + 1] = refName
 
     const front = `<img src="${origName}">`
-    const back = `<img src="${refName}">`
+    const back = `<div>origin</div><img src="${origName}"><div>ref</div><img src="${refName}">`
     const noteId = nowMs + i
     insNote.run([
       noteId,
